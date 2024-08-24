@@ -24,7 +24,7 @@ export default function robots(): MetadataRoute.Robots {
 				allow: '/'
 			}
 		],
-		sitemap: 'https://www.红鲤鱼与绿鲤鱼与驴.cn/sitemap.xml',
-		host: 'https://www.红鲤鱼与绿鲤鱼与驴.cn'
+		sitemap: 'http://hlyyllyyl.com/sitemap.xml',
+		host: 'http://hlyyllyyl.com/'
 	};
 }

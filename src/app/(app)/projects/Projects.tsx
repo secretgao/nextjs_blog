@@ -8,7 +8,7 @@ export function Projects(): React.ReactElement {
 	const projects: ProjectItem[] = [
 		{
 			id: '1',
-			url: 'https://www.红鲤鱼与绿鲤鱼与驴.cn',
+			url: 'http://hlyyllyyl.com/',
 			icon: 红鲤鱼与绿鲤鱼与驴BlogIcon,
 			name: '红鲤鱼与绿鲤鱼与驴 的个人博客',
 			description: '基于 Next.js 创建的博客网站，',
