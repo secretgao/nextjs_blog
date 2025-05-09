@@ -1,48 +1,153 @@
 ---
-title: Next.js 项目太坑了，一个简单的样式库，就把项目玩坏了
-date: 2024-08-16T04:46:22Z
-slug: post-10
+title: 阿里云 centos 服务器，使用宝塔 + webHook 自动同步代码，构建部署
+date: 2024-08-18T08:27:30Z
+slug: post-12
 author: secretgao：https://github.com/secretgao
-tags: ["bug","Next.js","踩坑记录"]
+tags: ["部署","CI/CD"]
 ---
 
-离大谱，我引入一个库，然后就成功把 Next.js 项目干卡死，而且通过容器化部署，实例达到了惊人的 4 个，什么概念，后端服务的实例也就才三个。前端竟然 4 个。下面看看我的干了什么吧！
+由于部署在服务器一个静态 blog：`https://mp.weixin.qq.com/s/tBxfcDsMIh_HCRS1EqBMoQ` ，希望源码变更就会自动重新部署，下面一起来实现一下
 
-## 背景
+## 需求
 
-最近在开发 Next.js 项目。有一个需求是把之前一个项目的功能搬到另外一个项目。写好的代码是 antd + tailwindcss 写的页面。新的项目是 Next.js + 没有tailwindcss 的。我就想能不能通过一个库直接把 tailwind 样式转为原生的样式。这样我就省事多了，确实是“省事”呢！
+我项目源码是在 github，通过 github issues 来存储 blog ，通过 github actions 来检查 issues 变更，自动更新代码，原本是在 vercel 部署，它可以关联 github 仓库，自动监控源码实现自动重新部署，现在因为部署在 vercel 不稳定，就迁移到 国内阿里云服务器，自己部署，那么之前的 CI/CD 就不生效了，需要自己再弄一下，要实现的话，我参考了网上的方案。我们先梳理一下我们的需求：
 
-## 开发
+1. 每次 github 源码更新，希望 gitee 的关联源码也会自动更新（这里暂时不行，只能手动重新点击同步按钮，也不是很麻烦）
+2. gitee 的源码更新，会提示宝塔服务器，在宝塔服务器上重新 build ，然后部署上线
 
-于是我就去找 tailwind css 转为行内样式的库。还真让我找到了 [tw-to-css](https://www.npmjs.com/package/tw-to-css) 。看了它的简介，我就更加开心了。
+## 实现
 
-![image-20240816085714940](https://blog-1304565468.cos.ap-shanghai.myqcloud.com/typora/image-20240816085714940.png)
+### 安装 git
 
-兼容客户端和服务端，而且减少构建时间，多好啊！我赶紧引入来使用它。使用它确实是很快就把原来的代码搬运到了新的项目，不需要再去定义 css 类，再创建 css 文件，写样式。但是我本地开发就发现，点击进入我的那个页面非常卡。最长达到了 13 秒，
+```bash
+# 安装命令
+yum -y install git
+# 然后看看是否安装成功
+git version
+# 生成秘钥
+ssh-keygen -t rsa
+# 拿到秘钥，给码云
+cd ~/.ssh
+cat id_rsa.pub
+```
 
-![企业微信截图_119ad3f1-1bcf-4790-bc60-d87ec077a95b](https://blog-1304565468.cos.ap-shanghai.myqcloud.com/typora/%E4%BC%81%E4%B8%9A%E5%BE%AE%E4%BF%A1%E6%88%AA%E5%9B%BE_119ad3f1-1bcf-4790-bc60-d87ec077a95b.png)
+git 拉取代码，成功 🎉🎉🎉
 
-然后。我还专门去前端小分队群里问了一下，大家会不会。但是大家的意思就是这可能是正常的，**这也是我为什么一直都没有怀疑我的代码有问题的原因**，啊啊啊啊啊，如果是正常项目，我肯定会先检查我的代码是不是出问题了，但是，我刚启动这个项目的时候，这个 Next.js 项目就经常卡死，点击反应很慢，导致我以为我开发的这个新页面很慢也是正常的，是 Next.js 的服务端渲染的问题。
+![img](https://blog-1304565468.cos.ap-shanghai.myqcloud.com/work/1723957015510-1055824c-67e6-40d2-8716-8d7eebba90c5.png)
 
-## 发现问题、找出问题
+### 安装 web hook
 
-我就忍着这么卡，开发完成，直到上线，通过容器化部署，上线后，实例数达到了 4 ，我那个时候差不多就肯定，一定是我的代码写的有问题了，然后我就赶紧去紧急回滚到之前的代码再部署。然后我就去对比我这个新的页面和其他不卡的服务端渲染页面的区别。最终锁定了 `tw-to-css` ，我就把所有 `tw-to-css` 方法去掉，然后刷新，结果不到一秒就响应了。太快啦！
+去宝塔面板【软件商店】搜索，然后安装
 
-## 最小复现
+![img](https://blog-1304565468.cos.ap-shanghai.myqcloud.com/work/1723955575913-cf60e14a-8b9b-4eaa-9f67-7055a41065f5.png)
 
-我写一个代码进行最小复现，使用 tw-to-css 后，客户端组件和服务器组件都会卡死，我去看一下源码，它依赖了 tailwind css 库，下次必须要看看引入新的库的源码了，不能简单看一下简介就好，感兴趣可以去看看：https://github.com/secregao/nextjs-with-antd/tree/tw-to-css-bug-show
+安装完毕我们点开插件选择：添加；名称随意，脚本里面先随便输入一下，晚点再写。提交后，我们可以看到列表就会有一条记录，我们点击查看密匙
 
-![image-20240816084628119](https://blog-1304565468.cos.ap-shanghai.myqcloud.com/typora/image-20240816084628119.png)
+![img](https://blog-1304565468.cos.ap-shanghai.myqcloud.com/work/1723955841856-dc3ed46e-7744-4bed-ad30-7836be8c74b7.png)
 
-## 反思 & 总结
+我们复制这个完整的链接
 
-1. 引入新库时要谨慎评估其性能影响。仅仅依赖库的描述是不够的，应该进行充分的测试
-2. 不能忽视明显的性能问题。即使其他人认为可能是正常现象，也要深入调查
-3. 在开发过程中引入新的库要进行性能检查和打包部署验证，不要等到部署后才发现问题
-4. 对于 Next.js 项目，要特别注意服务端渲染的性能。某些库可能在客户端运行良好，但在服务端会造成严重的性能问题
-5. 保持代码的简洁和模块化，这样在遇到问题时更容易定位和解决
+![img](https://blog-1304565468.cos.ap-shanghai.myqcloud.com/work/1723955910161-862e7123-0f36-4eac-8a8d-c7682ed555fd.png)
 
-不知道你们在开发 Next.js 的时候遇到了什么样的坑，分享一下，大家互相转发，不再吃这种亏
+我们去码云去配置 webhooks （果然哪里都有“马云”）
+
+![img](https://blog-1304565468.cos.ap-shanghai.myqcloud.com/work/1723956118470-2571693d-5a95-4a20-babb-0e96fcf525f7.png)
+
+我们点击 【添加 webHooks】然后，我们填写对应的信息和勾选对应的事情，点击确定就好了，我们会看到
+
+![img](https://blog-1304565468.cos.ap-shanghai.myqcloud.com/work/1723956327949-72627f3d-7090-4289-82c5-1d0d4ea96378.png)
+
+然后，我们去宝塔的【webHook】配置，添加我们刚刚创建的 Hook 的脚本
+
+```bash
+#!/bin/bash
+echo ""
+#输出当前时间
+date --date='0 days ago' "+%Y-%m-%d %H:%M:%S"
+echo "Start"
+#git分支名称
+branch="main"
+#git项目路径
+gitPath="/www/wwwroot/blog"
+#git 仓库地址
+gitHttp="git@gitee.com:secretgao/blog.git"
+#gitHttp="http://192.168.2.20/llh/$1.git" //多仓库的时候
+echo "Web站点路径：$gitPath"
+#判断项目路径是否存在
+if [ -d "$gitPath" ]; then
+cd $gitPath
+#判断是否存在git目录
+if [ ! -d ".git" ]; then
+echo "在该目录下克隆 git"
+sudo git clone $gitHttp gittemp
+sudo mv gittemp/.git .
+sudo rm -rf gittemp
+fi
+echo "拉取最新的项目文件"
+#sudo git reset --hard origin/$branch
+git remote add origin $gitHttp
+git branch --set-upstream-to=origin/$branch $branch
+sudo git reset --hard origin/$branch
+sudo git pull $gitHttp 2>&1
+echo "设置目录权限"
+sudo chown -R www:www $gitPath
+echo "End"
+exit
+else
+echo "该项目路径不存在"
+echo "新建项目目录"
+mkdir $gitPath
+cd $gitPath
+#判断是否存在git目录
+if [ ! -d ".git" ]; then
+echo "在该目录下克隆 git"
+sudo git clone $gitHttp gittemp
+sudo mv gittemp/.git .
+sudo rm -rf gittemp
+fi
+echo "拉取最新的项目文件"
+#sudo git reset --hard origin/$branch
+sudo git pull gitHttp 2>&1
+echo "设置目录权限"
+sudo chown -R www:www $gitPath
+echo "pnpm run build"
+sudo pnpm i &&  pnpm run build
+echo "End"
+exit
+fi
+```
+
+我们只需要把一些配置改为自己的，最后的脚本需要改为自己实际的，简单解释一下这段代码
+
+这段代码是一个Bash脚本，用于自动化部署Git项目。让我们逐步解析其功能：
+
+1. 脚本开始时输出当前日期和时间 
+2. 定义了几个变量：
+
+- - `branch`: Git分支名称（"mian"，可能是"main"的拼写错误）
+  - `gitPath`: Git项目的本地路径
+  - `gitHttp`: Git仓库的远程地址
+
+1. 脚本检查`$gitPath`是否存在：如果存在：
+
+如果不存在：
+
+- - 进入该目录
+  - 检查是否有`.git`目录，如果没有，克隆仓库并移动`.git`目录
+  - 更新远程仓库地址和分支跟踪
+  - 强制重置到远程分支的最新状态
+  - 拉取最新代码
+  - 设置目录权限
+  - 创建新目录
+  - 克隆仓库
+  - 拉取最新代码
+  - 设置目录权限
+  - 运行`pnpm i`和`pnpm run build`命令
+
+1. 脚本使用`sudo`命令执行某些操作，这需要管理员权限 
+2. 最后，脚本设置目录的所有者为"www"用户和组，这通常用于web服务器配置。
+
+这个脚本的主要目的是自动化 Git 项目的部署过程，包括克隆仓库、更新代码、设置权限等步骤。它还包含了一些错误处理和条件逻辑，以适应不同的情况（如项目目录是否已存在）
 
 ---
-此文自动发布于：<a href="https://github.com/secregao/blog/issues/10" target="_blank">github issues</a>
+此文自动发布于：<a href="https://github.com/secregao/blog/issues/12" target="_blank">github issues</a>
